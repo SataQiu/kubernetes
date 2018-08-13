@@ -102,6 +102,7 @@ func NewCmdDescribe(parent string, f cmdutil.Factory, streams genericclioptions.
 
 	cmd := &cobra.Command{
 		Use: "describe (-f FILENAME | TYPE [NAME_PREFIX | -l label] | TYPE/NAME)",
+		Aliases: []string{"desc"},
 		DisableFlagsInUseLine: true,
 		Short:   i18n.T("Show details of a specific resource or group of resources"),
 		Long:    describeLong + "\n\n" + cmdutil.SuggestApiResources(parent),
