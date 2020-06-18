@@ -56,12 +56,19 @@ func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleSta
 		return framework.NewStatus(framework.Error, "invalid nodeInfo")
 	}
 
-	filterPredicate := func(t *v1.Taint) bool {
+	tolerationFilterPredicate := func(t *v1.Toleration) bool {
+		if t.Effect == v1.TaintEffectNoExecute {
+			return t.TolerationSeconds == nil
+		}
+		return true
+	}
+
+	taintFilterPredicate := func(t *v1.Taint) bool {
 		// PodToleratesNodeTaints is only interested in NoSchedule and NoExecute taints.
 		return t.Effect == v1.TaintEffectNoSchedule || t.Effect == v1.TaintEffectNoExecute
 	}
 
-	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, pod.Spec.Tolerations, filterPredicate)
+	taint, isUntolerated := v1helper.FindMatchingUntoleratedTaint(nodeInfo.Node().Spec.Taints, getFilteredTolerations(pod.Spec.Tolerations, tolerationFilterPredicate), taintFilterPredicate)
 	if !isUntolerated {
 		return nil
 	}
@@ -69,6 +76,23 @@ func (pl *TaintToleration) Filter(ctx context.Context, state *framework.CycleSta
 	errReason := fmt.Sprintf("node(s) had taint {%s: %s}, that the pod didn't tolerate",
 		taint.Key, taint.Value)
 	return framework.NewStatus(framework.UnschedulableAndUnresolvable, errReason)
+}
+
+type tolerationFilterFunc func(*v1.Toleration) bool
+
+// getFilteredTolerations returns a list of tolerations satisfying the filter predicate
+func getFilteredTolerations(tolerations []v1.Toleration, inclusionFilter tolerationFilterFunc) []v1.Toleration {
+	if inclusionFilter == nil {
+		return tolerations
+	}
+	filteredTolerations := []v1.Toleration{}
+	for _, toleration := range tolerations {
+		if !inclusionFilter(&toleration) {
+			continue
+		}
+		filteredTolerations = append(filteredTolerations, toleration)
+	}
+	return filteredTolerations
 }
 
 // preScoreState computed at PreScore and used at Score.
