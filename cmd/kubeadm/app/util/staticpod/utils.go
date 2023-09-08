@@ -36,6 +36,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/dump"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/klog/v2"
 
 	kubeadmapi "k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm"
 	kubeadmconstants "k8s.io/kubernetes/cmd/kubeadm/app/constants"
@@ -353,6 +354,14 @@ func GetEtcdProbeEndpoint(cfg *kubeadmapi.Etcd, isIPv6 bool) (string, int32, v1.
 
 // ManifestFilesAreEqual compares 2 files. It returns true if their contents are equal, false otherwise
 func ManifestFilesAreEqual(path1, path2 string) (bool, error) {
+
+	oldBytes, _ := os.ReadFile(path1)
+	newBytes, _ := os.ReadFile(path2)
+
+	klog.Infoln(string(oldBytes))
+	klog.Infoln("NEW")
+	klog.Infoln(string(newBytes))
+
 	pod1, err := ReadStaticPodFromDisk(path1)
 	if err != nil {
 		return false, err
@@ -362,13 +371,25 @@ func ManifestFilesAreEqual(path1, path2 string) (bool, error) {
 		return false, err
 	}
 
+	klog.Infoln(pod1)
+
+	klog.Infoln("DIFFFFF")
+
+	klog.Infoln(pod2)
+
 	hasher := md5.New()
 	DeepHashObject(hasher, pod1)
 	hash1 := hasher.Sum(nil)[0:]
 	DeepHashObject(hasher, pod2)
 	hash2 := hasher.Sum(nil)[0:]
 
-	return bytes.Equal(hash1, hash2), nil
+	e := bytes.Equal(hash1, hash2)
+
+	if !e {
+		klog.Infoln("不相等，", hash1, hash2)
+	}
+
+	return e, nil
 }
 
 // getProbeAddress returns a valid probe address.
